@@ -1,0 +1,6 @@
+{
+  "name": "KhelaGhor",
+  "description": "Premium Live Sports Streaming & Channel Guide application with integrated admin settings and advanced ExoPlayer controls",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

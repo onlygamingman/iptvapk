@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Left stump -->
+    <path
+        android:fillColor="#FF39FF14"
+        android:pathData="M5,7h1.5v13H5V7z"/>
+    <!-- Middle stump -->
+    <path
+        android:fillColor="#FF39FF14"
+        android:pathData="M9.5,7H11v13H9.5V7z"/>
+    <!-- Right stump -->
+    <path
+        android:fillColor="#FF39FF14"
+        android:pathData="M14,7h1.5v13H14V7z"/>
+    <!-- Bails -->
+    <path
+        android:fillColor="#FF39FF14"
+        android:pathData="M4,4.5h12.5v1.5H4V4.5z"/>
+    <!-- Cricket Ball -->
+    <path
+        android:fillColor="#FFFF3F3F"
+        android:pathData="M20.5,15c0,1.93 -1.57,3.5 -3.5,3.5s-3.5,-1.57 -3.5,-3.5 1.57,-3.5 3.5,-3.5 3.5,1.57 3.5,3.5z"/>
+</vector>
