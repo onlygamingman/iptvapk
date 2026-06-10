@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS `app_config` (
   `pop_under_url` text DEFAULT NULL,
   `banner_ad_code` text DEFAULT NULL,
   `pop_under_code` text DEFAULT NULL,
+  `show_notice` tinyint(1) NOT NULL DEFAULT '1',
+  `notice_title` varchar(255) DEFAULT 'খেলাঘর নোটিশ বোর্ড',
+  `notice_message` text DEFAULT NULL,
+  `notice_button_text` varchar(100) DEFAULT 'টেলিগ্রামে জয়েন করুন',
+  `notice_link` text DEFAULT NULL,
   `admin_password_hash` varchar(255) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)

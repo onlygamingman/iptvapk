@@ -161,6 +161,19 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun updateNoticeSettings(show: Boolean, title: String, message: String, btnText: String, linkUrl: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = repository.getConfigOnce() ?: AppConfigEntity()
+            repository.updateConfig(current.copy(
+                showNotice = show,
+                noticeTitle = title,
+                noticeMessage = message,
+                noticeButtonText = btnText,
+                noticeLink = linkUrl
+            ))
+        }
+    }
+
     fun changeAdminPassword(oldPasswordClear: String, newPasswordClear: String): Boolean {
         var success = false
         val currentPassHash = run {

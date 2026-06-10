@@ -387,13 +387,37 @@ fun MatchCard(
     match: MatchEntity,
     onWatchClick: () -> Unit
 ) {
+    // Elegant neon shimmering gradient border animation
+    val infiniteTransition = rememberInfiniteTransition(label = "card_neon_border")
+    val borderOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    val neonBorderBrush = Brush.linearGradient(
+        colors = listOf(
+            ForestGreen.copy(alpha = 0.3f),
+            NeonGreen,
+            ForestGreen.copy(alpha = 0.3f),
+            NeonGreen,
+            ForestGreen.copy(alpha = 0.3f)
+        ),
+        start = androidx.compose.ui.geometry.Offset(borderOffset, 0f),
+        end = androidx.compose.ui.geometry.Offset(borderOffset + 400f, 400f)
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("match_card_${match.id}"),
         colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
-        border = BorderStroke(1.2.dp, ForestGreen.copy(alpha = 0.4f)),
+        border = BorderStroke(1.5.dp, neonBorderBrush),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -445,6 +469,12 @@ fun MatchCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            val defaultLogoRes = when (match.category) {
+                "Cricket" -> com.example.R.drawable.ic_cricket
+                "Football" -> com.example.R.drawable.ic_football
+                else -> com.example.R.drawable.ic_others
+            }
+
             // Team VS representation block
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -459,6 +489,9 @@ fun MatchCard(
                 ) {
                     AsyncImage(
                         model = match.team1LogoUrl,
+                        placeholder = painterResource(id = defaultLogoRes),
+                        error = painterResource(id = defaultLogoRes),
+                        fallback = painterResource(id = defaultLogoRes),
                         contentDescription = "${match.team1Name} logo",
                         modifier = Modifier
                             .size(34.dp)
@@ -506,6 +539,9 @@ fun MatchCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     AsyncImage(
                         model = match.team2LogoUrl,
+                        placeholder = painterResource(id = defaultLogoRes),
+                        error = painterResource(id = defaultLogoRes),
+                        fallback = painterResource(id = defaultLogoRes),
                         contentDescription = "${match.team2Name} logo",
                         modifier = Modifier
                             .size(34.dp)
@@ -952,12 +988,25 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
     var popCodeInput by remember { mutableStateOf("") }
     var adSettingsSucceed by remember { mutableStateOf("") }
 
+    // Notice Settings inputs
+    var showNoticeInput by remember { mutableStateOf(true) }
+    var noticeTitleInput by remember { mutableStateOf("KhelaGhor Notice Board") }
+    var noticeMessageInput by remember { mutableStateOf("") }
+    var noticeButtonTextInput by remember { mutableStateOf("টেলিগ্রামে জয়েন করুন") }
+    var noticeLinkInput by remember { mutableStateOf("") }
+    var noticeSettingsSucceed by remember { mutableStateOf("") }
+
     LaunchedEffect(appConfig) {
         appConfig?.let {
             bannerUrlInput = it.bannerAdUrl
             popUrlInput = it.popUnderUrl
             bannerCodeInput = it.bannerAdCode
             popCodeInput = it.popUnderCode
+            showNoticeInput = it.showNotice
+            noticeTitleInput = it.noticeTitle
+            noticeMessageInput = it.noticeMessage
+            noticeButtonTextInput = it.noticeButtonText
+            noticeLinkInput = it.noticeLink
         }
     }
 
@@ -1537,6 +1586,72 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(text = "বিজ্ঞাপন সেটিংস সেভ করুন", fontWeight = FontWeight.Black)
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 16.dp)
+                        ) {
+                            Text(text = "অ্যাপ নোটিশ বোর্ড সেটিংস", color = NeonGreen, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = showNoticeInput,
+                                onCheckedChange = { showNoticeInput = it },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = NeonGreen)
+                            )
+                        }
+
+                        TextField(
+                            value = noticeTitleInput,
+                            onValueChange = { noticeTitleInput = it },
+                            label = { Text("নোটিশ টাইটেল (Notice Title)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
+                        )
+
+                        TextField(
+                            value = noticeMessageInput,
+                            onValueChange = { noticeMessageInput = it },
+                            label = { Text("নোটিশ মেসেজ (Notice Message)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black),
+                            maxLines = 4
+                        )
+
+                        TextField(
+                            value = noticeButtonTextInput,
+                            onValueChange = { noticeButtonTextInput = it },
+                            label = { Text("অ্যাকশন বাটন টেক্সট (Button Text)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
+                        )
+
+                        TextField(
+                            value = noticeLinkInput,
+                            onValueChange = { noticeLinkInput = it },
+                            label = { Text("অ্যাকশন লিংক / Telegram URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
+                        )
+
+                        if (noticeSettingsSucceed.isNotEmpty()) {
+                            Text(text = noticeSettingsSucceed, color = NeonGreen, fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.updateNoticeSettings(
+                                    show = showNoticeInput,
+                                    title = noticeTitleInput,
+                                    message = noticeMessageInput,
+                                    btnText = noticeButtonTextInput,
+                                    linkUrl = noticeLinkInput
+                                )
+                                noticeSettingsSucceed = "নোটিশবোর্ড সেটিংস সফলভাবে সেভ করা হয়েছে!"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "নোটিশবোর্ড সেটিংস সেভ করুন", fontWeight = FontWeight.Black)
                         }
 
                         Text(text = "পাসওয়ার্ড পরিবর্তন করুন (Change Password)", color = NeonGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))

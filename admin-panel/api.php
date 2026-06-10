@@ -39,7 +39,7 @@ switch($action) {
 
     case 'config':
         try {
-            $stmt = $pdo->prepare("SELECT ads_enabled, banner_ad_url, pop_under_url, banner_ad_code, pop_under_code FROM app_config WHERE id = 1 LIMIT 1");
+            $stmt = $pdo->prepare("SELECT ads_enabled, banner_ad_url, pop_under_url, banner_ad_code, pop_under_code, show_notice, notice_title, notice_message, notice_button_text, notice_link FROM app_config WHERE id = 1 LIMIT 1");
             $stmt->execute();
             $result = $stmt->fetch();
             echo json_encode(["status" => "success", "data" => $result]);

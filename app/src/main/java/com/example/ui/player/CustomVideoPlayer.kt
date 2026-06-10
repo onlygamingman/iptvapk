@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,7 +98,7 @@ fun CustomVideoPlayer(
     // UI Overlay state management
     var showControls by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
-    var resizeMode by remember { mutableStateOf(ScreenResizeMode.FIT) }
+    var resizeMode by remember { mutableStateOf(ScreenResizeMode.STRETCH) }
 
     // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(showControls) {
@@ -282,39 +283,55 @@ fun CustomVideoPlayer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Left: Adaptive Bitrate Note
+                    // Left: Small Settings Icon (Auto)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
                             tint = NeonGreen,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Auto Resolution (Adaptive)",
+                            text = "Auto",
                             color = Color.White,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
-                    // Right: Aspect Ratio Aspect Ratio fitting Button controllers
+                    // Right: Aspect Ratio Aspect Ratio fitting Button controllers with square toggle button
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
+                        IconButton(
+                            onClick = {
+                                val allModes = ScreenResizeMode.values()
+                                val nextIndex = (allModes.indexOf(resizeMode) + 1) % allModes.size
+                                resizeMode = allModes[nextIndex]
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(15.dp)
+                                    .border(2.dp, NeonGreen, RoundedCornerShape(3.dp))
+                            )
+                        }
+
                         Text(
                             text = "Aspect: ",
                             color = Color.Gray,
                             fontSize = 11.sp,
-                            modifier = Modifier.padding(start = 6.dp)
+                            modifier = Modifier.padding(start = 4.dp)
                         )
                         ScreenResizeMode.values().forEach { mode ->
                             val isSelected = resizeMode == mode

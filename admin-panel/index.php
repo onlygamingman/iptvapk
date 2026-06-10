@@ -136,9 +136,15 @@ if ($authenticated) {
         $banner_code = $_POST['banner_ad_code'] ?? '';
         $pop_code = $_POST['pop_under_code'] ?? '';
 
-        $stmt = $pdo->prepare("UPDATE app_config SET ads_enabled = ?, banner_ad_url = ?, pop_under_url = ?, banner_ad_code = ?, pop_under_code = ? WHERE id = 1");
-        $stmt->execute([$ads, $banner, $pop, $banner_code, $pop_code]);
-        $msg = "বিজ্ঞাপন সেটিংস আপডেট করা হয়েছে!";
+        $show_notice = isset($_POST['show_notice']) ? 1 : 0;
+        $notice_title = $_POST['notice_title'] ?? 'খেলাঘর নোটিশ বোর্ড';
+        $notice_message = $_POST['notice_message'] ?? '';
+        $notice_button_text = $_POST['notice_button_text'] ?? 'টেলিগ্রামে জয়েন করুন';
+        $notice_link = $_POST['notice_link'] ?? '';
+
+        $stmt = $pdo->prepare("UPDATE app_config SET ads_enabled = ?, banner_ad_url = ?, pop_under_url = ?, banner_ad_code = ?, pop_under_code = ?, show_notice = ?, notice_title = ?, notice_message = ?, notice_button_text = ?, notice_link = ? WHERE id = 1");
+        $stmt->execute([$ads, $banner, $pop, $banner_code, $pop_code, $show_notice, $notice_title, $notice_message, $notice_button_text, $notice_link]);
+        $msg = "বিজ্ঞাপন ও নোটিশ সেটিংস আপডেট করা হয়েছে!";
         $msg_type = "success";
     }
 
@@ -401,11 +407,36 @@ if ($authenticated) {
                                     <input type="url" name="pop_under_url" class="form-control" value="<?php echo htmlspecialchars($conf['pop_under_url'] ?? ''); ?>">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-neon">⚡ Adsterra পপ-আন্ডার ব্যানার স্ক্রিপ্ট কোড (Raw HTML/JS Script Code):</label>
+                                    <label class="form-label text-neon">⚡ Adsterra পপ-আন্ডার ব্যান্তর স্ক্রিপ্ট কোড (Raw HTML/JS Script Code):</label>
                                     <textarea name="pop_under_code" class="form-control font-monospace" rows="5" placeholder="এখানে Adsterra পপ-আন্ডার কোড পেস্ট করুন"><?php echo htmlspecialchars($conf['pop_under_code'] ?? ''); ?></textarea>
                                     <small class="text-secondary d-block mt-1">এখানে Adsterra পপ-আন্ডার অ্যাড কোড কিংবা সরাসরি ডিরেক্ট লিংক ডোমেইন কোড পেস্ট করতে পারেন।</small>
                                 </div>
-                                <button type="submit" name="update_config" class="btn btn-neon w-100">বিজ্ঞাপন আপডেট করুন</button>
+
+                                <hr class="border-secondary my-4">
+                                <h5 class="text-neon fw-bold mb-3">🔔 অ্যাপ নোটিশ বোর্ড সেটিংস (In-App Notice Settings)</h5>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="show_notice" id="show_notice" <?php echo ($conf && $conf['show_notice']) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="show_notice">অ্যাপে ঢোকার সময় নোটিশ পপআপ দেখান (Show Notice on Open)</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-neon">নোটিশ টাইটেল (Notice Title)</label>
+                                    <input type="text" name="notice_title" class="form-control" value="<?php echo htmlspecialchars($conf['notice_title'] ?? 'খেলাঘর নোটিশ বোর্ড'); ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-neon">নোটিশ মেসেজ (Notice Message)</label>
+                                    <textarea name="notice_message" class="form-control" rows="3" placeholder="এখানে নোটিশটি বাংলায় লিখুন"><?php echo htmlspecialchars($conf['notice_message'] ?? 'খেলাঘর অ্যাপে আপনাকে স্বাগতম!'); ?></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-neon">অ্যাকশন বাটন টেক্সট (Action Button Label)</label>
+                                    <input type="text" name="notice_button_text" class="form-control" value="<?php echo htmlspecialchars($conf['notice_button_text'] ?? 'টেলিগ্রামে জয়েন করুন'); ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-neon">অ্যাকশন লিংক (Redirect URL / Telegram Link)</label>
+                                    <input type="url" name="notice_link" class="form-control" value="<?php echo htmlspecialchars($conf['notice_link'] ?? ''); ?>" placeholder="https://t.me/khelaghor">
+                                    <small class="text-secondary d-block mt-1">নোটিশের বাটনে ক্লিক করলে ইউজারকে এই লিংকে নেওয়া হবে (যেমন: টেলিগ্রাম চ্যানেল বা অন্য কোনো ইউআরএল)।</small>
+                                </div>
+
+                                <button type="submit" name="update_config" class="btn btn-neon w-100">বিজ্ঞাপন ও নোটিশ সেটিংস আপডেট করুন</button>
                             </form>
                         </div>
 

@@ -49,6 +49,11 @@ data class AppConfigEntity(
     val popUnderUrl: String = "https://www.google.com",
     val bannerAdCode: String = "",
     val popUnderCode: String = "",
+    val showNotice: Boolean = true,
+    val noticeTitle: String = "KhelaGhor Notice Board",
+    val noticeMessage: String = "লাইভ খেলা দেখতে ও যেকোনো সমস্যায় আমাদের অফিসিয়াল Telegram চ্যানেলে যুক্ত থাকুন। ধন্যবাদ!",
+    val noticeButtonText: String = "টেলিগ্রামে জয়েন করুন",
+    val noticeLink: String = "https://t.me/khelaghor",
     val adminPasswordHash: String = "admin123", // Default admin password
     val apiSyncEnabled: Boolean = false,
     val apiSyncUrl: String = ""
@@ -116,7 +121,7 @@ interface AppConfigDao {
 // Database
 // ==========================================
 
-@Database(entities = [MatchEntity::class, ChannelEntity::class, AppConfigEntity::class], version = 2, exportSchema = false)
+@Database(entities = [MatchEntity::class, ChannelEntity::class, AppConfigEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun matchDao(): MatchDao
     abstract fun channelDao(): ChannelDao
