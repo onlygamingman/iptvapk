@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -89,13 +90,14 @@ class MainActivity : ComponentActivity() {
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.Center
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Sport Glimpse",
-                                            tint = NeonGreen,
-                                            modifier = Modifier.size(24.dp)
+                                        Image(
+                                            painter = painterResource(id = R.drawable.khelaghor_logo_1781080798786),
+                                            contentDescription = "KhelaGhor Logo",
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(RoundedCornerShape(50))
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Text(
                                             text = "KhelaGhor",
                                             color = Color.White,
@@ -286,12 +288,13 @@ fun SplashScreen(onDismiss: () -> Unit) {
                     )
                 }
 
-                // Inner static play icon
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = NeonGreen,
-                    modifier = Modifier.size(36.dp)
+                // Inner static custom brand logo representation
+                Image(
+                    painter = painterResource(id = R.drawable.khelaghor_logo_1781080798786),
+                    contentDescription = "KhelaGhor Logo",
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(50))
                 )
             }
 
