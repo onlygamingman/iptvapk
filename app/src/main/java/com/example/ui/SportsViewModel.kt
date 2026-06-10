@@ -58,12 +58,28 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     private val _blockTimeRemaining = MutableStateFlow(0L)
     val blockTimeRemaining: StateFlow<Long> = _blockTimeRemaining
 
+    // Web API Sync Status
+    private val _syncStatus = MutableStateFlow("সিঙ্ক সম্পন্ন হয়নি")
+    val syncStatus: StateFlow<String> = _syncStatus
+
     init {
         // Real-time ticking system every 1 second for countdown timers
         viewModelScope.launch {
             while (true) {
                 _currentTime.value = System.currentTimeMillis()
                 delay(1000)
+            }
+        }
+
+        // Background automatic sync (updates from online site every 30 seconds if enabled)
+        viewModelScope.launch {
+            delay(3000) // Brief delay on startup
+            while (true) {
+                val config = repository.getConfigOnce()
+                if (config != null && config.apiSyncEnabled && config.apiSyncUrl.isNotBlank()) {
+                    performApiSync()
+                }
+                delay(30000) // sync check every 30 seconds
             }
         }
     }
@@ -259,5 +275,112 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
 
     fun logoutAdmin() {
         _adminLoggedIn.value = false
+    }
+
+    fun performApiSync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val config = repository.getConfigOnce()
+            if (config == null || !config.apiSyncEnabled || config.apiSyncUrl.isBlank()) {
+                _syncStatus.value = "সিঙ্ক বন্ধ বা ইউআরএল ফাঁকা"
+                return@launch
+            }
+            _syncStatus.value = "সার্ভার থেকে লাইভ সিঙ্ক হচ্ছে..."
+            try {
+                val urlConnection = java.net.URL(config.apiSyncUrl).openConnection() as java.net.HttpURLConnection
+                urlConnection.connectTimeout = 10000
+                urlConnection.readTimeout = 10000
+                urlConnection.requestMethod = "GET"
+                
+                if (urlConnection.responseCode == 200) {
+                    val stream = urlConnection.inputStream
+                    val responseStr = stream.bufferedReader().use { it.readText() }
+                    
+                    val json = org.json.JSONObject(responseStr)
+                    
+                    // 1. Config Sync
+                    if (json.has("config")) {
+                        val cJson = json.getJSONObject("config")
+                        val updatedConfig = config.copy(
+                            adsEnabled = cJson.optBoolean("adsEnabled", config.adsEnabled),
+                            bannerAdUrl = cJson.optString("bannerAdUrl", config.bannerAdUrl),
+                            popUnderUrl = cJson.optString("popUnderUrl", config.popUnderUrl),
+                            bannerAdCode = cJson.optString("bannerAdCode", config.bannerAdCode),
+                            popUnderCode = cJson.optString("popUnderCode", config.popUnderCode),
+                            showNotice = cJson.optBoolean("showNotice", config.showNotice),
+                            noticeTitle = cJson.optString("noticeTitle", config.noticeTitle),
+                            noticeMessage = cJson.optString("noticeMessage", config.noticeMessage),
+                            noticeButtonText = cJson.optString("noticeButtonText", config.noticeButtonText),
+                            noticeLink = cJson.optString("noticeLink", config.noticeLink)
+                        )
+                        repository.updateConfig(updatedConfig)
+                    }
+                    
+                    // 2. Matches Sync
+                    if (json.has("matches")) {
+                        val currentList = repository.allMatches.firstOrNull() ?: emptyList()
+                        for (m in currentList) {
+                            repository.deleteMatchById(m.id)
+                        }
+                        
+                        val arr = json.getJSONArray("matches")
+                        for (i in 0 until arr.length()) {
+                            val item = arr.getJSONObject(i)
+                            repository.addMatch(
+                                MatchEntity(
+                                    category = item.optString("category", "Cricket"),
+                                    team1Name = item.optString("team1Name", "T1"),
+                                    team1LogoUrl = item.optString("team1LogoUrl", ""),
+                                    team2Name = item.optString("team2Name", "T2"),
+                                    team2LogoUrl = item.optString("team2LogoUrl", ""),
+                                    streamUrl = item.optString("streamUrl", ""),
+                                    tournament = item.optString("tournament", "LIVE"),
+                                    status = item.optString("status", "LIVE"),
+                                    startTimeStamp = item.optLong("startTimeStamp", 0L)
+                                )
+                            )
+                        }
+                    }
+                    
+                    // 3. Channels Sync
+                    if (json.has("channels")) {
+                        val currentList = repository.allChannels.firstOrNull() ?: emptyList()
+                        for (c in currentList) {
+                            repository.deleteChannelById(c.id)
+                        }
+                        
+                        val arr = json.getJSONArray("channels")
+                        for (i in 0 until arr.length()) {
+                            val item = arr.getJSONObject(i)
+                            repository.addChannel(
+                                ChannelEntity(
+                                    categoryName = item.optString("categoryName", "Bangladesh"),
+                                    channelName = item.optString("channelName", "Channel"),
+                                    channelLogoUrl = item.optString("channelLogoUrl", ""),
+                                    streamUrl = item.optString("streamUrl", "")
+                                )
+                            )
+                        }
+                    }
+                    val sdf = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault())
+                    val timeStr = sdf.format(java.util.Date())
+                    _syncStatus.value = "সিঙ্ক সফল: ম্যাচ এবং চ্যানেল আপডেট হয়েছে! ($timeStr)"
+                } else {
+                    _syncStatus.value = "সিঙ্ক ব্যর্থ রেসপন্স কোড: ${urlConnection.responseCode}"
+                }
+            } catch (e: Exception) {
+                _syncStatus.value = "সার্ভার কানেকশন ত্রুটি: ${e.localizedMessage ?: "নেটওয়ার্ক ট্রাবল"}"
+            }
+        }
+    }
+
+    fun updateApiSyncSettings(enabled: Boolean, url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = repository.getConfigOnce() ?: AppConfigEntity()
+            val updated = current.copy(apiSyncEnabled = enabled, apiSyncUrl = url)
+            repository.updateConfig(updated)
+            if (enabled && url.isNotBlank()) {
+                performApiSync()
+            }
+        }
     }
 }

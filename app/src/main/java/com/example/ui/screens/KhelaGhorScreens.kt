@@ -998,6 +998,13 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
     var noticeLinkInput by remember { mutableStateOf("") }
     var noticeSettingsSucceed by remember { mutableStateOf("") }
 
+    // API Sync inputs
+    var apiSyncEnabledInput by remember { mutableStateOf(false) }
+    var apiSyncUrlInput by remember { mutableStateOf("") }
+    var apiSyncSettingsSucceed by remember { mutableStateOf("") }
+    val apiSyncStatus by viewModel.syncStatus.collectAsState()
+    var showPhpInfoDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(appConfig) {
         appConfig?.let {
             bannerUrlInput = it.bannerAdUrl
@@ -1009,6 +1016,8 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
             noticeMessageInput = it.noticeMessage
             noticeButtonTextInput = it.noticeButtonText
             noticeLinkInput = it.noticeLink
+            apiSyncEnabledInput = it.apiSyncEnabled
+            apiSyncUrlInput = it.apiSyncUrl
         }
     }
 
@@ -1952,9 +1961,240 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
                                 }
                             }
                         }
+
+                        // 6. Web API Sync Settings Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Cloud server",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "অনলাইন ডাটাবেস সিঙ্ক (Server Sync)",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Switch(
+                                        checked = apiSyncEnabledInput,
+                                        onCheckedChange = { apiSyncEnabledInput = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = NeonGreen
+                                        )
+                                    )
+                                }
+
+                                Text(
+                                    text = "আপনার নিজের ডোমেন/হোস্টিং কিনে PHP/JSON এপিআই-এর মাধ্যমে সকল ডিভাইসে খেলা ও নোটিশ সরাসরি আপডেট করতে এটি চালু করুন।",
+                                    color = GrayText,
+                                    fontSize = 11.sp
+                                )
+
+                                TextField(
+                                    value = apiSyncUrlInput,
+                                    onValueChange = { apiSyncUrlInput = it },
+                                    label = { Text("আমার ডোমেন API URL (যেমন: yourname.com/api.php)") },
+                                    placeholder = { Text("https://example.com/api.php") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateApiSyncSettings(
+                                                apiSyncEnabledInput,
+                                                apiSyncUrlInput
+                                            )
+                                            apiSyncSettingsSucceed = "সিঙ্ক সেটিংস সেভ করা হয়েছে!"
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = NeonGreen,
+                                            contentColor = Color.Black
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(text = "সেটিংস সেভ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.performApiSync()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color.White,
+                                            contentColor = Color.Black
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Sync Now", modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(text = "সিঙ্ক করুন", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+
+                                if (apiSyncStatus.isNotEmpty()) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "স্ট্যাটাস: $apiSyncStatus",
+                                            color = if (apiSyncStatus.contains("সফল")) NeonGreen else Color.LightGray,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Button(
+                                    onClick = { showPhpInfoDialog = true },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ForestGreen,
+                                        contentColor = Color.White
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Build, contentDescription = "Instructions", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "সার্ভার ফাইল ও ডোমেন সেটআপ নির্দেশাবলী", fontSize = 12.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (showPhpInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhpInfoDialog = false },
+            containerColor = DarkGreenBg,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Info, contentDescription = "How to", tint = NeonGreen)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "ডোমেন হোস্টিং সার্ভার সেটআপ", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "আপনার ডোমেন ও হোস্টিং কেনার পর নিচের সহজ ধাপগুলো অনুসরণ করুন:",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "১. হোস্টিং প্যানেলে (cPanel etc.) প্রবেশ করে File Manager-এ যান।\n" +
+                               "২. একটি PHP ফাইল তৈরি করুন (যেমন: api.php)\n" +
+                               "৩. নিচের কোড বক্স থেকে কোড কপি করে আপনার ফাইলে পেস্ট করে দিন ও সেভ করুন।\n" +
+                               "৪. অ্যাপে ওই লিংকটি (যেমন https://yourdomain.com/api.php) প্রবেশ করিয়ে সিঙ্ক ইনেবল সেভ করুন।",
+                        color = GrayText,
+                        fontSize = 12.sp
+                    )
+
+                    Text(
+                        text = "ফাইল ১: api.php কোড",
+                        color = NeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(
+                                text = """<?php
+header('Content-Type: application/json');
+if (!file_exists('data.json')) {
+    file_put_contents('data.json', json_encode([
+        'config' => [
+            'adsEnabled' => true,
+            'bannerAdUrl' => 'https://example.com',
+            'popUnderUrl' => 'https://example.com',
+            'bannerAdCode' => '',
+            'popUnderCode' => '',
+            'showNotice' => true,
+            'noticeTitle' => 'KhelaGhor',
+            'noticeMessage' => 'Welcome!',
+            'noticeButtonText' => 'Join Telegram',
+            'noticeLink' => 'https://t.me/khelaghor'
+        ],
+        'matches' => [],
+        'channels' => []
+    ], JSON_PRETTY_PRINT));
+}
+echo file_get_contents('data.json');
+?>""",
+                                color = Color.Green,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "ফাইল ২: admin.php ও অন্যান্য ফাইল",
+                        color = NeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = "আপনার নিজের ব্রাউজার থেকে ডোমেইনে গিয়ে সরাসরি ম্যাচ, টিভি চ্যানেল এবং বিজ্ঞাপন কন্ট্রোল করার জন্য একটি সম্পূর্ণ Admin Panel ওয়েব স্ক্রিপ্ট রেডি আছে। আমরা চ্যাটে আপনাকে সম্পূর্ণ PHP ওয়েব এডমিন প্যানেলের কোডটি দিয়ে দিচ্ছি, যা আপনি সরাসরি ডোমেইনে আপলোড করতে পারবেন।",
+                        color = GrayText,
+                        fontSize = 11.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPhpInfoDialog = false }) {
+                    Text(text = "ঠিক আছে", color = NeonGreen, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }
