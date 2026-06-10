@@ -13,6 +13,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -1507,198 +1509,448 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(DarkGreenSurface, RoundedCornerShape(12.dp))
-                            .padding(16.dp),
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(text = "বিজ্ঞাপন প্লেসমেন্ট সেটিংস (Ad Controllers)", color = NeonGreen, fontWeight = FontWeight.Bold)
-
-                        // Ads Master Toggle setting
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(text = "মাস্টার বিজ্ঞাপন অন/অফ সুইচ", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "সব বিজ্ঞাপন তাত্ক্ষণিকভাবে অন/অফ করুন", color = GrayText, fontSize = 10.sp)
-                            }
-
-                            Switch(
-                                checked = appConfig?.adsEnabled ?: true,
-                                onCheckedChange = { viewModel.toggleAds(it) },
-                                colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
-                            )
-                        }
-
-                        // Ads Config inputs
-                        Text(text = "ব্যানার ও পপ-আন্ডার ইউআরএল এবং অ্যাড কোড সেটিংস", color = NeonGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-
-                        TextField(
-                            value = bannerUrlInput,
-                            onValueChange = { bannerUrlInput = it },
-                            label = { Text("ব্যানার বিজ্ঞাপন 728x90 URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        TextField(
-                            value = bannerCodeInput,
-                            onValueChange = { bannerCodeInput = it },
-                            label = { Text("⚡ Adsterra 728x90 ব্যানার স্ক্রিপ্ট কোড (HTML/JS Code)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black),
-                            maxLines = 4
-                        )
-
-                        TextField(
-                            value = popUrlInput,
-                            onValueChange = { popUrlInput = it },
-                            label = { Text("পপ-আন্ডার প্রমোশনাল Redirect URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        TextField(
-                            value = popCodeInput,
-                            onValueChange = { popCodeInput = it },
-                            label = { Text("⚡ Adsterra পপ-আন্ডার স্ক্রিপ্ট কোড (HTML/JS Code)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black),
-                            maxLines = 4
-                        )
-
-                        if (adSettingsSucceed.isNotEmpty()) {
-                            Text(text = adSettingsSucceed, color = NeonGreen, fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                viewModel.updateAdUrls(
-                                    bannerUrl = bannerUrlInput,
-                                    popUrl = popUrlInput,
-                                    bannerCode = bannerCodeInput,
-                                    popCode = popCodeInput
-                                )
-                                adSettingsSucceed = "বিজ্ঞাপন সেটিংস সফলভাবে সেভ করা হয়েছে!"
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                        // 1. Master Ad Switch Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(text = "বিজ্ঞাপন সেটিংস সেভ করুন", fontWeight = FontWeight.Black)
-                        }
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "মাস্টার বিজ্ঞাপন নিয়ন্ত্রণ",
+                                            color = NeonGreen,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "সব বিজ্ঞাপন তাত্ক্ষণিকভাবে চালু বা বন্ধ করুন",
+                                            color = GrayText,
+                                            fontSize = 11.sp
+                                        )
+                                    }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 16.dp)
-                        ) {
-                            Text(text = "অ্যাপ নোটিশ বোর্ড সেটিংস", color = NeonGreen, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = showNoticeInput,
-                                onCheckedChange = { showNoticeInput = it },
-                                colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = NeonGreen)
-                            )
-                        }
-
-                        TextField(
-                            value = noticeTitleInput,
-                            onValueChange = { noticeTitleInput = it },
-                            label = { Text("নোটিশ টাইটেল (Notice Title)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        TextField(
-                            value = noticeMessageInput,
-                            onValueChange = { noticeMessageInput = it },
-                            label = { Text("নোটিশ মেসেজ (Notice Message)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black),
-                            maxLines = 4
-                        )
-
-                        TextField(
-                            value = noticeButtonTextInput,
-                            onValueChange = { noticeButtonTextInput = it },
-                            label = { Text("অ্যাকশন বাটন টেক্সট (Button Text)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        TextField(
-                            value = noticeLinkInput,
-                            onValueChange = { noticeLinkInput = it },
-                            label = { Text("অ্যাকশন লিংক / Telegram URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        if (noticeSettingsSucceed.isNotEmpty()) {
-                            Text(text = noticeSettingsSucceed, color = NeonGreen, fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                viewModel.updateNoticeSettings(
-                                    show = showNoticeInput,
-                                    title = noticeTitleInput,
-                                    message = noticeMessageInput,
-                                    btnText = noticeButtonTextInput,
-                                    linkUrl = noticeLinkInput
-                                )
-                                noticeSettingsSucceed = "নোটিশবোর্ড সেটিংস সফলভাবে সেভ করা হয়েছে!"
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(text = "নোটিশবোর্ড সেটিংস সেভ করুন", fontWeight = FontWeight.Black)
-                        }
-
-                        Text(text = "পাসওয়ার্ড পরিবর্তন করুন (Change Password)", color = NeonGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-
-                        TextField(
-                            value = oldPassword,
-                            onValueChange = { oldPassword = it },
-                            visualTransformation = PasswordVisualTransformation(),
-                            label = { Text("বর্তমান পাসওয়ার্ড") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        TextField(
-                            value = newPassword,
-                            onValueChange = { newPassword = it },
-                            visualTransformation = PasswordVisualTransformation(),
-                            label = { Text("নতুন পাসওয়ার্ড") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black)
-                        )
-
-                        if (passChangeMessage.isNotEmpty()) {
-                            Text(
-                                text = passChangeMessage,
-                                color = if (passChangeMessage.contains("সফল")) NeonGreen else RedLive,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                if (oldPassword.isBlank() || newPassword.isBlank()) return@Button
-                                val ok = viewModel.changeAdminPassword(oldPassword, newPassword)
-                                if (ok) {
-                                    passChangeMessage = "পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে!"
-                                    oldPassword = ""
-                                    newPassword = ""
-                                } else {
-                                    passChangeMessage = "বর্তমান পাসওয়ার্ড ভুল!"
+                                    Switch(
+                                        checked = appConfig?.adsEnabled ?: true,
+                                        onCheckedChange = { viewModel.toggleAds(it) },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = NeonGreen,
+                                            uncheckedThumbColor = Color.Gray,
+                                            uncheckedTrackColor = Color.DarkGray
+                                        )
+                                    )
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                            }
+                        }
+
+                        // 2. Banner Ad Settings Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(text = "পাসওয়ার্ড আপডেট করুন", fontWeight = FontWeight.Black)
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = "Banner",
+                                        tint = NeonGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "ব্যানার বিজ্ঞাপন (728x90) সেটিংস",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Text(
+                                    text = "Adsterra থেকে প্রাপ্ত ব্যানার লিঙ্ক এবং স্ক্রিপ্ট কোডটি এখানে সাবমিট করুন।",
+                                    color = GrayText,
+                                    fontSize = 11.sp
+                                )
+
+                                TextField(
+                                    value = bannerUrlInput,
+                                    onValueChange = { bannerUrlInput = it },
+                                    label = { Text("ব্যানার বিজ্ঞাপন 728x90 URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                TextField(
+                                    value = bannerCodeInput,
+                                    onValueChange = { bannerCodeInput = it },
+                                    label = { Text("Adsterra ব্যানার স্ক্রিপ্ট কোড (HTML/JS)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    ),
+                                    maxLines = 4
+                                )
+
+                                Button(
+                                    onClick = {
+                                        viewModel.updateAdUrls(
+                                            bannerUrl = bannerUrlInput,
+                                            popUrl = popUrlInput,
+                                            bannerCode = bannerCodeInput,
+                                            popCode = popCodeInput
+                                        )
+                                        adSettingsSucceed = "ব্যানার বিজ্ঞাপন সেটিংস সফলভাবে সেভ করা হয়েছে!"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NeonGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Save")
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "ব্যানার সেটিংস সেভ করুন", fontWeight = FontWeight.Bold)
+                                }
+
+                                if (adSettingsSucceed.isNotEmpty() && adSettingsSucceed.contains("ব্যানার")) {
+                                    Text(text = adSettingsSucceed, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+
+                        // 3. Pop-under promotional Settings Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Pop under",
+                                        tint = NeonGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "পপ-আন্ডার রিডাইরেক্ট সেটিংস",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Text(
+                                    text = "পপ-আন্ডার প্রমোশনাল লিংক বা এডাইসটারার পপ-আন্ডার স্ক্রিপ্ট কোডটি এখানে দিন।",
+                                    color = GrayText,
+                                    fontSize = 11.sp
+                                )
+
+                                TextField(
+                                    value = popUrlInput,
+                                    onValueChange = { popUrlInput = it },
+                                    label = { Text("পপ-আন্ডার প্রমোশনাল Redirect URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                TextField(
+                                    value = popCodeInput,
+                                    onValueChange = { popCodeInput = it },
+                                    label = { Text("Adsterra পপ-আন্ডার স্ক্রিপ্ট কোড (HTML/JS)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    ),
+                                    maxLines = 4
+                                )
+
+                                Button(
+                                    onClick = {
+                                        viewModel.updateAdUrls(
+                                            bannerUrl = bannerUrlInput,
+                                            popUrl = popUrlInput,
+                                            bannerCode = bannerCodeInput,
+                                            popCode = popCodeInput
+                                        )
+                                        adSettingsSucceed = "পপ-আন্ডার বিজ্ঞাপন সেটিংস সফলভাবে সেভ করা হয়েছে!"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NeonGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Save")
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "পপ-আন্ডার সেটিংস সেভ করুন", fontWeight = FontWeight.Bold)
+                                }
+
+                                if (adSettingsSucceed.isNotEmpty() && adSettingsSucceed.contains("পপ-আন্ডার")) {
+                                    Text(text = adSettingsSucceed, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+
+                        // 4. App Notice board Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Notifications,
+                                            contentDescription = "Notice board",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "অ্যাপ নোটিশ বোর্ড সেটিংস",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Switch(
+                                        checked = showNoticeInput,
+                                        onCheckedChange = { showNoticeInput = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = NeonGreen
+                                        )
+                                    )
+                                }
+
+                                Text(
+                                    text = "অ্যাপে প্রদর্শিত নোটিফিকেশন মেসেজ ও টেলিগ্রাম বা অন্যান্য লিংক এখান থেকে নিয়ন্ত্রণ করুন।",
+                                    color = GrayText,
+                                    fontSize = 11.sp
+                                )
+
+                                TextField(
+                                    value = noticeTitleInput,
+                                    onValueChange = { noticeTitleInput = it },
+                                    label = { Text("নোটিশ টাইটেল (Notice Title)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                TextField(
+                                    value = noticeMessageInput,
+                                    onValueChange = { noticeMessageInput = it },
+                                    label = { Text("নোটিশ মেসেজ (Notice Message)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    ),
+                                    maxLines = 4
+                                )
+
+                                TextField(
+                                    value = noticeButtonTextInput,
+                                    onValueChange = { noticeButtonTextInput = it },
+                                    label = { Text("অ্যাকশন বাটন টেক্সট (Button Text)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                TextField(
+                                    value = noticeLinkInput,
+                                    onValueChange = { noticeLinkInput = it },
+                                    label = { Text("অ্যাকশন লিংক / Telegram URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                Button(
+                                    onClick = {
+                                        viewModel.updateNoticeSettings(
+                                            show = showNoticeInput,
+                                            title = noticeTitleInput,
+                                            message = noticeMessageInput,
+                                            btnText = noticeButtonTextInput,
+                                            linkUrl = noticeLinkInput
+                                        )
+                                        noticeSettingsSucceed = "নোটিশবোর্ড সেটিংস সফলভাবে সেভ করা হয়েছে!"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NeonGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Save")
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "নোটিশবোর্ড সেটিংস সেভ করুন", fontWeight = FontWeight.Bold)
+                                }
+
+                                if (noticeSettingsSucceed.isNotEmpty()) {
+                                    Text(text = noticeSettingsSucceed, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+
+                        // 5. Admin Security Settings Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Security",
+                                        tint = NeonGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "পাসওয়ার্ড পরিবর্তন করুন (Security)",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                TextField(
+                                    value = oldPassword,
+                                    onValueChange = { oldPassword = it },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    label = { Text("বর্তমান পাসওয়ার্ড") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                TextField(
+                                    value = newPassword,
+                                    onValueChange = { newPassword = it },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    label = { Text("নতুন পাসওয়ার্ড") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                Button(
+                                    onClick = {
+                                        if (oldPassword.isBlank() || newPassword.isBlank()) return@Button
+                                        val ok = viewModel.changeAdminPassword(oldPassword, newPassword)
+                                        if (ok) {
+                                            passChangeMessage = "পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে!"
+                                            oldPassword = ""
+                                            newPassword = ""
+                                        } else {
+                                            passChangeMessage = "বর্তমান পাসওয়ার্ড ভুল!"
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NeonGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Lock, contentDescription = "Password")
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "পাসওয়ার্ড আপডেট করুন", fontWeight = FontWeight.Bold)
+                                }
+
+                                if (passChangeMessage.isNotEmpty()) {
+                                    Text(
+                                        text = passChangeMessage,
+                                        color = if (passChangeMessage.contains("সফল")) NeonGreen else RedLive,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
                     }
                 }

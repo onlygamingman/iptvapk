@@ -5,10 +5,13 @@ import android.content.pm.ActivityInfo
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -36,10 +40,10 @@ import com.example.ui.theme.RedLive
 import kotlinx.coroutines.delay
 
 enum class ScreenResizeMode(val title: String, val modeValue: Int) {
-    FIT("Fit to Screen", AspectRatioFrameLayout.RESIZE_MODE_FIT),
     STRETCH("Stretch", AspectRatioFrameLayout.RESIZE_MODE_FILL),
-    ZOOM("Zoom/Crop", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
-    ORIGINAL("Original", AspectRatioFrameLayout.RESIZE_MODE_FIT) // Standard Fit
+    FIT("Fit to Screen", AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    ZOOM("Zoom / Crop", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+    ORIGINAL("Original", AspectRatioFrameLayout.RESIZE_MODE_FIT)
 }
 
 @OptIn(UnstableApi::class)
@@ -52,12 +56,15 @@ fun CustomVideoPlayer(
     val context = LocalContext.current
     val activity = context as? Activity
 
-    // Manage Fullscreen Portrait/Landscape Cycle
+    // Manage Fullscreen & Keep Screen Awake to prevent screen dimming during matching gameplay
     DisposableEffect(Unit) {
         val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
-        // Hide bars
+        // Enable Keep Screen On flag
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Hide system bars (Immersive mode)
         activity?.window?.let { window ->
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             insetsController.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
@@ -66,6 +73,8 @@ fun CustomVideoPlayer(
 
         onDispose {
             activity?.requestedOrientation = originalOrientation
+            // Disable Keep Screen On flag
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             activity?.window?.let { window ->
                 val insetsController = WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
@@ -99,12 +108,25 @@ fun CustomVideoPlayer(
     var showControls by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ScreenResizeMode.STRETCH) }
+    var isLocked by remember { mutableStateOf(false) }
 
-    // Auto-hide controls after 4 seconds of inactivity
-    LaunchedEffect(showControls) {
-        if (showControls) {
-            delay(4000)
+    // Transient overlay toast notification for options changes (e.g. "Stretched", "Quality: Auto")
+    var activeToastMessage by remember { mutableStateOf<String?>(null) }
+    var toastTrigger by remember { mutableStateOf(0) }
+
+    // Auto-hide controls after 3.5 seconds of inactivity (if not locked)
+    LaunchedEffect(showControls, isLocked) {
+        if (showControls && !isLocked) {
+            delay(3500)
             showControls = false
+        }
+    }
+
+    // Clear active toast after 1.5 seconds
+    LaunchedEffect(toastTrigger) {
+        if (activeToastMessage != null) {
+            delay(1500)
+            activeToastMessage = null
         }
     }
 
@@ -112,14 +134,17 @@ fun CustomVideoPlayer(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable { showControls = !showControls }
+            .clickable {
+                showControls = !showControls
+            }
     ) {
         // Player View Container
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    useController = false // Hide default black controllers to use custom Compose UI
+                    useController = false // Hide default black system controllers to use custom Compose UI
+                    keepScreenOn = true // Keep screen awake at view level as well
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -132,26 +157,65 @@ fun CustomVideoPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Custom Overlay UI
-        if (showControls) {
+        // Lock Status Overlay Indicator (Floating action button to lock/unlock easily)
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn() + expandIn(expandFrom = Alignment.Center),
+            exit = fadeOut() + shrinkOut(shrinkTowards = Alignment.Center),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 24.dp)
+        ) {
+            IconButton(
+                onClick = {
+                    isLocked = !isLocked
+                    activeToastMessage = if (isLocked) "Controls Locked" else "Controls Unlocked"
+                    toastTrigger++
+                },
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Lock controls",
+                    tint = if (isLocked) RedLive else NeonGreen,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        // Custom Overlay UI (Only visible when controls are on AND NOT LOCKED)
+        AnimatedVisibility(
+            visible = showControls && !isLocked,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { -50 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { -50 }),
+            modifier = Modifier.fillMaxSize()
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color.Black.copy(alpha = 0.45f))
                     .padding(20.dp)
             ) {
-                // Header (Back + Stream Name)
+                // Header (Back + Stream Name) - Beautiful Glass Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter),
+                        .align(Alignment.TopCenter)
+                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = onBackClick,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
@@ -164,14 +228,14 @@ fun CustomVideoPlayer(
                             Text(
                                 text = title,
                                 color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black
                             )
                             Text(
                                 text = "KhelaGhor Pro Streaming",
                                 color = NeonGreen,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -180,7 +244,8 @@ fun CustomVideoPlayer(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Box(
@@ -192,13 +257,13 @@ fun CustomVideoPlayer(
                         Text(
                             text = "LIVE",
                             color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
                         )
                     }
                 }
 
-                // Middle Buttons (Play, Pause, Forward, Rewind)
+                // Middle Buttons (Play, Pause, Forward, Rewind) - Premium Glass Controls
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalArrangement = Arrangement.Center,
@@ -211,7 +276,8 @@ fun CustomVideoPlayer(
                         },
                         modifier = Modifier
                             .size(54.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(27.dp))
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(27.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(27.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
@@ -235,15 +301,15 @@ fun CustomVideoPlayer(
                         modifier = Modifier
                             .size(72.dp)
                             .background(NeonGreen, RoundedCornerShape(36.dp))
+                            .border(2.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(36.dp))
                     ) {
                         if (isPlaying) {
-                            // Impeccable Custom Pause double-pillars
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(modifier = Modifier.width(6.dp).height(22.dp).background(Color.Black))
-                                Box(modifier = Modifier.width(6.dp).height(22.dp).background(Color.Black))
+                                Box(modifier = Modifier.width(5.dp).height(22.dp).background(Color.Black))
+                                Box(modifier = Modifier.width(5.dp).height(22.dp).background(Color.Black))
                             }
                         } else {
                             Icon(
@@ -264,7 +330,8 @@ fun CustomVideoPlayer(
                         },
                         modifier = Modifier
                             .size(54.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(27.dp))
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(27.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(27.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowForward,
@@ -275,84 +342,138 @@ fun CustomVideoPlayer(
                     }
                 }
 
-                // Bottom Panel (Resize logic / Bitrate indicator)
+                // BOTTOM RIGHT FLOATING GLASSMORPHIC MENU BAR
+                // Contains small modern icons like Cast, Crop/Aspect, quality gear options without large text
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter),
+                        .align(Alignment.BottomEnd)
+                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Left: Small Settings Icon (Auto)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    // Refresh Stream reload Button
+                    IconButton(
+                        onClick = {
+                            activeToastMessage = "Reloading Match Stream..."
+                            toastTrigger++
+                            val mediaItem = MediaItem.fromUri(streamUrl)
+                            exoPlayer.setMediaItem(mediaItem)
+                            exoPlayer.prepare()
+                            exoPlayer.play()
+                        },
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = NeonGreen,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Auto",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Reload stream",
+                            tint = Color.White,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
-                    // Right: Aspect Ratio Aspect Ratio fitting Button controllers with square toggle button
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    // Video quality Settings Mock Icon Button
+                    IconButton(
+                        onClick = {
+                            activeToastMessage = "Video Quality: Auto Adaptive"
+                            toastTrigger++
+                        },
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        IconButton(
-                            onClick = {
-                                val allModes = ScreenResizeMode.values()
-                                val nextIndex = (allModes.indexOf(resizeMode) + 1) % allModes.size
-                                resizeMode = allModes[nextIndex]
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(15.dp)
-                                    .border(2.dp, NeonGreen, RoundedCornerShape(3.dp))
-                            )
-                        }
-
-                        Text(
-                            text = "Aspect: ",
-                            color = Color.Gray,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(start = 4.dp)
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Set quality options",
+                            tint = Color.White,
+                            modifier = Modifier.size(19.dp)
                         )
-                        ScreenResizeMode.values().forEach { mode ->
-                            val isSelected = resizeMode == mode
-                            TextButton(
-                                onClick = { resizeMode = mode },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = if (isSelected) NeonGreen else Color.LightGray
-                                ),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text(
-                                    text = mode.name,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
+                    }
+
+                    // Screen Aspect Ratio cycle button with icon indicator
+                    IconButton(
+                        onClick = {
+                            val allModes = ScreenResizeMode.values()
+                            val nextIndex = (allModes.indexOf(resizeMode) + 1) % allModes.size
+                            resizeMode = allModes[nextIndex]
+                            activeToastMessage = "Aspect Ratio: ${resizeMode.title}"
+                            toastTrigger++
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(19.dp)
+                        ) {
+                            when (resizeMode) {
+                                ScreenResizeMode.STRETCH -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(18.dp)
+                                            .height(11.dp)
+                                            .border(1.8.dp, NeonGreen, RoundedCornerShape(2.dp))
+                                    )
+                                }
+                                ScreenResizeMode.FIT -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(13.dp)
+                                            .height(13.dp)
+                                            .border(1.8.dp, NeonGreen, RoundedCornerShape(2.dp))
+                                    )
+                                }
+                                ScreenResizeMode.ZOOM -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(18.dp)
+                                            .height(13.dp)
+                                            .border(1.8.dp, NeonGreen, RoundedCornerShape(2.dp))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.Center)
+                                                .size(3.5.dp)
+                                                .background(NeonGreen, CircleShape)
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(15.dp)
+                                            .height(12.dp)
+                                            .border(1.2.dp, NeonGreen, RoundedCornerShape(1.dp))
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
+        // Elegant Transient Toast overlay for status feedback (e.g. "Aspect Ratio: Stretch")
+        AnimatedVisibility(
+            visible = activeToastMessage != null,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { 30 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { -30 }),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 75.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(12.dp))
+                    .border(1.dp, NeonGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = activeToastMessage ?: "",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
+
