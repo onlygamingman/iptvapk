@@ -8,10 +8,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 
 class SportsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = SportsRepository(application)
+
+    private var matchesListener: ValueEventListener? = null
+    private var channelsListener: ValueEventListener? = null
+    private var configListener: ValueEventListener? = null
+
+    private var currentFirebaseDbUrl: String? = null
+    private var currentFirebaseSyncEnabled: Boolean? = null
+
+    private var matchesRef: DatabaseReference? = null
+    private var channelsRef: DatabaseReference? = null
+    private var configRef: DatabaseReference? = null
 
     // Current category horizontal filter: "All", "Cricket", "Football", "Others"
     private val _selectedFilter = MutableStateFlow("All")
@@ -82,6 +98,8 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                 delay(30000) // sync check every 30 seconds
             }
         }
+
+        setupFirebaseRealtimeSync()
     }
 
     fun setFilter(filter: String) {
@@ -91,6 +109,25 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     // ==========================================
     // Match Actions
     // ==========================================
+    private suspend fun saveConfig(updatedConfig: AppConfigEntity) {
+        if (updatedConfig.firebaseSyncEnabled && configRef != null) {
+            val configMap = mapOf(
+                "adsEnabled" to updatedConfig.adsEnabled,
+                "bannerAdUrl" to updatedConfig.bannerAdUrl,
+                "popUnderUrl" to updatedConfig.popUnderUrl,
+                "bannerAdCode" to updatedConfig.bannerAdCode,
+                "popUnderCode" to updatedConfig.popUnderCode,
+                "showNotice" to updatedConfig.showNotice,
+                "noticeTitle" to updatedConfig.noticeTitle,
+                "noticeMessage" to updatedConfig.noticeMessage,
+                "noticeButtonText" to updatedConfig.noticeButtonText,
+                "noticeLink" to updatedConfig.noticeLink
+            )
+            configRef?.setValue(configMap)
+        }
+        repository.updateConfig(updatedConfig)
+    }
+
     fun addNewMatch(
         category: String,
         team1Name: String,
@@ -108,24 +145,53 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 0L
             }
-            val match = MatchEntity(
-                category = category,
-                team1Name = team1Name,
-                team1LogoUrl = team1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
-                team2Name = team2Name,
-                team2LogoUrl = team2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
-                streamUrl = streamUrl,
-                tournament = tournament,
-                status = status,
-                startTimeStamp = startTimeStamp
-            )
-            repository.addMatch(match)
+
+            val trimmedT1Logo = team1Logo.trim()
+            val trimmedT2Logo = team2Logo.trim()
+            val trimmedStreamUrl = streamUrl.trim()
+
+            val config = repository.getConfigOnce()
+            if (config != null && config.firebaseSyncEnabled && matchesRef != null) {
+                val finalId = (100000..999999).random()
+                val matchMap = mapOf(
+                    "id" to finalId,
+                    "category" to category,
+                    "team1Name" to team1Name,
+                    "team1LogoUrl" to trimmedT1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    "team2Name" to team2Name,
+                    "team2LogoUrl" to trimmedT2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    "streamUrl" to trimmedStreamUrl,
+                    "tournament" to tournament,
+                    "status" to status,
+                    "startTimeStamp" to startTimeStamp,
+                    "addedAt" to System.currentTimeMillis()
+                )
+                matchesRef?.child(finalId.toString())?.setValue(matchMap)
+            } else {
+                val match = MatchEntity(
+                    category = category,
+                    team1Name = team1Name,
+                    team1LogoUrl = trimmedT1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    team2Name = team2Name,
+                    team2LogoUrl = trimmedT2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    streamUrl = trimmedStreamUrl,
+                    tournament = tournament,
+                    status = status,
+                    startTimeStamp = startTimeStamp
+                )
+                repository.addMatch(match)
+            }
         }
     }
 
     fun finishAndRemoveMatch(id: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteMatchById(id)
+            val config = repository.getConfigOnce()
+            if (config != null && config.firebaseSyncEnabled && matchesRef != null) {
+                matchesRef?.child(id.toString())?.removeValue()
+            } else {
+                repository.deleteMatchById(id)
+            }
         }
     }
 
@@ -139,19 +205,41 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
         streamUrl: String
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            val channel = ChannelEntity(
-                categoryName = categoryName,
-                channelName = channelName,
-                channelLogoUrl = channelLogoUrl.ifBlank { "https://photos.stream/tv.png" },
-                streamUrl = streamUrl
-            )
-            repository.addChannel(channel)
+            val trimmedLogoUrl = channelLogoUrl.trim()
+            val trimmedStreamUrl = streamUrl.trim()
+
+            val config = repository.getConfigOnce()
+            if (config != null && config.firebaseSyncEnabled && channelsRef != null) {
+                val finalId = (100000..999999).random()
+                val channelMap = mapOf(
+                    "id" to finalId,
+                    "categoryName" to categoryName,
+                    "channelName" to channelName,
+                    "channelLogoUrl" to trimmedLogoUrl.ifBlank { "https://photos.stream/tv.png" },
+                    "streamUrl" to trimmedStreamUrl,
+                    "addedAt" to System.currentTimeMillis()
+                )
+                channelsRef?.child(finalId.toString())?.setValue(channelMap)
+            } else {
+                val channel = ChannelEntity(
+                    categoryName = categoryName,
+                    channelName = channelName,
+                    channelLogoUrl = trimmedLogoUrl.ifBlank { "https://photos.stream/tv.png" },
+                    streamUrl = trimmedStreamUrl
+                )
+                repository.addChannel(channel)
+            }
         }
     }
 
     fun removeChannel(id: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteChannelById(id)
+            val config = repository.getConfigOnce()
+            if (config != null && config.firebaseSyncEnabled && channelsRef != null) {
+                channelsRef?.child(id.toString())?.removeValue()
+            } else {
+                repository.deleteChannelById(id)
+            }
         }
     }
 
@@ -161,14 +249,14 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleAds(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val current = repository.getConfigOnce() ?: AppConfigEntity()
-            repository.updateConfig(current.copy(adsEnabled = enabled))
+            saveConfig(current.copy(adsEnabled = enabled))
         }
     }
 
     fun updateAdUrls(bannerUrl: String, popUrl: String, bannerCode: String, popCode: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val current = repository.getConfigOnce() ?: AppConfigEntity()
-            repository.updateConfig(current.copy(
+            saveConfig(current.copy(
                 bannerAdUrl = bannerUrl,
                 popUnderUrl = popUrl,
                 bannerAdCode = bannerCode,
@@ -180,7 +268,7 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     fun updateNoticeSettings(show: Boolean, title: String, message: String, btnText: String, linkUrl: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val current = repository.getConfigOnce() ?: AppConfigEntity()
-            repository.updateConfig(current.copy(
+            saveConfig(current.copy(
                 showNotice = show,
                 noticeTitle = title,
                 noticeMessage = message,
@@ -382,5 +470,218 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                 performApiSync()
             }
         }
+    }
+
+    fun updateFirebaseSyncSettings(enabled: Boolean, url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = repository.getConfigOnce() ?: AppConfigEntity()
+            val updated = current.copy(firebaseSyncEnabled = enabled, firebaseDatabaseUrl = url)
+            repository.updateConfig(updated)
+        }
+    }
+
+    private fun setupFirebaseRealtimeSync() {
+        viewModelScope.launch {
+            repository.appConfig.collect { config ->
+                if (config == null) return@collect
+
+                val dbUrlChanged = config.firebaseDatabaseUrl != currentFirebaseDbUrl
+                val syncEnabledChanged = config.firebaseSyncEnabled != currentFirebaseSyncEnabled
+
+                if (dbUrlChanged || syncEnabledChanged) {
+                    currentFirebaseDbUrl = config.firebaseDatabaseUrl
+                    currentFirebaseSyncEnabled = config.firebaseSyncEnabled
+
+                    // Remove old listeners
+                    removeFirebaseListeners()
+
+                    if (config.firebaseSyncEnabled) {
+                        try {
+                            val dbInstance = if (config.firebaseDatabaseUrl.isNotBlank()) {
+                                FirebaseDatabase.getInstance(config.firebaseDatabaseUrl)
+                            } else {
+                                FirebaseDatabase.getInstance()
+                            }
+
+                            matchesRef = dbInstance.getReference("matches")
+                            channelsRef = dbInstance.getReference("channels")
+                            configRef = dbInstance.getReference("app_config")
+
+                            attachFirebaseListeners()
+                        } catch (e: java.lang.Exception) {
+                            _syncStatus.value = "Firebase সংযোগ ত্রুটি: ${e.localizedMessage}"
+                        }
+                    } else {
+                        _syncStatus.value = "Firebase সিঙ্ক নিষ্ক্রিয়"
+                    }
+                }
+            }
+        }
+    }
+
+    private fun removeFirebaseListeners() {
+        matchesListener?.let { matchesRef?.removeEventListener(it) }
+        channelsListener?.let { channelsRef?.removeEventListener(it) }
+        configListener?.let { configRef?.removeEventListener(it) }
+
+        matchesListener = null
+        channelsListener = null
+        configListener = null
+    }
+
+    private fun attachFirebaseListeners() {
+        _syncStatus.value = "ফায়ারবেস থেকে রিয়েল-টাইম ডাটা সিঙ্ক হচ্ছে..."
+
+        // 1. Matches Listener
+        matchesListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val matchesList = mutableListOf<MatchEntity>()
+                        for (child in snapshot.children) {
+                            val id = child.child("id").getValue(Int::class.java) ?: continue
+                            val category = child.child("category").getValue(String::class.java) ?: "Cricket"
+                            val team1Name = child.child("team1Name").getValue(String::class.java) ?: ""
+                            val team1LogoUrl = child.child("team1LogoUrl").getValue(String::class.java) ?: ""
+                            val team2Name = child.child("team2Name").getValue(String::class.java) ?: ""
+                            val team2LogoUrl = child.child("team2LogoUrl").getValue(String::class.java) ?: ""
+                            val streamUrl = child.child("streamUrl").getValue(String::class.java) ?: ""
+                            val tournament = child.child("tournament").getValue(String::class.java) ?: ""
+                            val status = child.child("status").getValue(String::class.java) ?: "LIVE"
+                            val startTimeStamp = child.child("startTimeStamp").getValue(Long::class.java) ?: 0L
+                            val addedAt = child.child("addedAt").getValue(Long::class.java) ?: System.currentTimeMillis()
+
+                            matchesList.add(
+                                MatchEntity(
+                                    id = id,
+                                    category = category,
+                                    team1Name = team1Name,
+                                    team1LogoUrl = team1LogoUrl,
+                                    team2Name = team2Name,
+                                    team2LogoUrl = team2LogoUrl,
+                                    streamUrl = streamUrl,
+                                    tournament = tournament,
+                                    status = status,
+                                    startTimeStamp = startTimeStamp,
+                                    addedAt = addedAt
+                                )
+                            )
+                        }
+
+                        // Clear current matches and insert the new synced ones
+                        val currentList = repository.allMatches.firstOrNull() ?: emptyList()
+                        for (m in currentList) {
+                            repository.deleteMatchById(m.id)
+                        }
+                        for (newMatch in matchesList) {
+                            repository.addMatch(newMatch)
+                        }
+                        updateSyncStatusTime()
+                    } catch (e: Exception) {
+                        _syncStatus.value = "ম্যাচ সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                _syncStatus.value = "Firebase Error: ${error.message}"
+            }
+        }
+        matchesRef?.addValueEventListener(matchesListener!!)
+
+        // 2. Channels Listener
+        channelsListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val channelsList = mutableListOf<ChannelEntity>()
+                        for (child in snapshot.children) {
+                            val id = child.child("id").getValue(Int::class.java) ?: continue
+                            val categoryName = child.child("categoryName").getValue(String::class.java) ?: "Bangladesh"
+                            val channelName = child.child("channelName").getValue(String::class.java) ?: ""
+                            val channelLogoUrl = child.child("channelLogoUrl").getValue(String::class.java) ?: ""
+                            val streamUrl = child.child("streamUrl").getValue(String::class.java) ?: ""
+                            val addedAt = child.child("addedAt").getValue(Long::class.java) ?: System.currentTimeMillis()
+
+                            channelsList.add(
+                                ChannelEntity(
+                                    id = id,
+                                    categoryName = categoryName,
+                                    channelName = channelName,
+                                    channelLogoUrl = channelLogoUrl,
+                                    streamUrl = streamUrl,
+                                    addedAt = addedAt
+                                )
+                            )
+                        }
+
+                        // Clear current channels and insert the new synced ones
+                        val currentList = repository.allChannels.firstOrNull() ?: emptyList()
+                        for (c in currentList) {
+                            repository.deleteChannelById(c.id)
+                        }
+                        for (newChan in channelsList) {
+                            repository.addChannel(newChan)
+                        }
+                        updateSyncStatusTime()
+                    } catch (e: Exception) {
+                        _syncStatus.value = "চ্যানেল সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                _syncStatus.value = "Firebase Error: ${error.message}"
+            }
+        }
+        channelsRef?.addValueEventListener(channelsListener!!)
+
+        // 3. Config Listener
+        configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        if (!snapshot.exists()) return@launch
+
+                        val adsEnabled = snapshot.child("adsEnabled").getValue(Boolean::class.java) ?: true
+                        val bannerAdUrl = snapshot.child("bannerAdUrl").getValue(String::class.java) ?: "https://www.google.com"
+                        val popUnderUrl = snapshot.child("popUnderUrl").getValue(String::class.java) ?: "https://www.google.com"
+                        val bannerAdCode = snapshot.child("bannerAdCode").getValue(String::class.java) ?: ""
+                        val popUnderCode = snapshot.child("popUnderCode").getValue(String::class.java) ?: ""
+                        val showNotice = snapshot.child("showNotice").getValue(Boolean::class.java) ?: true
+                        val noticeTitle = snapshot.child("noticeTitle").getValue(String::class.java) ?: "KhelaGhor Notice Board"
+                        val noticeMessage = snapshot.child("noticeMessage").getValue(String::class.java) ?: ""
+                        val noticeButtonText = snapshot.child("noticeButtonText").getValue(String::class.java) ?: ""
+                        val noticeLink = snapshot.child("noticeLink").getValue(String::class.java) ?: ""
+
+                        val current = repository.getConfigOnce() ?: AppConfigEntity()
+                        val updated = current.copy(
+                            adsEnabled = adsEnabled,
+                            bannerAdUrl = bannerAdUrl,
+                            popUnderUrl = popUnderUrl,
+                            bannerAdCode = bannerAdCode,
+                            popUnderCode = popUnderCode,
+                            showNotice = showNotice,
+                            noticeTitle = noticeTitle,
+                            noticeMessage = noticeMessage,
+                            noticeButtonText = noticeButtonText,
+                            noticeLink = noticeLink
+                        )
+                        repository.updateConfig(updated)
+                        updateSyncStatusTime()
+                    } catch (e: Exception) {
+                        _syncStatus.value = "কনফিগারেশন সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                _syncStatus.value = "Firebase Error: ${error.message}"
+            }
+        }
+        configRef?.addValueEventListener(configListener!!)
+    }
+
+    private fun updateSyncStatusTime() {
+        val sdf = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault())
+        val timeStr = sdf.format(java.util.Date())
+        _syncStatus.value = "ফায়ারবেস সিঙ্ক সক্রিয় ($timeStr)"
     }
 }

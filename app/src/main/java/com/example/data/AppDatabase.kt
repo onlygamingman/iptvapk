@@ -56,7 +56,9 @@ data class AppConfigEntity(
     val noticeLink: String = "https://t.me/khelaghor",
     val adminPasswordHash: String = "admin123", // Default admin password
     val apiSyncEnabled: Boolean = false,
-    val apiSyncUrl: String = ""
+    val apiSyncUrl: String = "",
+    val firebaseSyncEnabled: Boolean = true,
+    val firebaseDatabaseUrl: String = ""
 )
 
 // ==========================================
@@ -121,7 +123,7 @@ interface AppConfigDao {
 // Database
 // ==========================================
 
-@Database(entities = [MatchEntity::class, ChannelEntity::class, AppConfigEntity::class], version = 3, exportSchema = false)
+@Database(entities = [MatchEntity::class, ChannelEntity::class, AppConfigEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun matchDao(): MatchDao
     abstract fun channelDao(): ChannelDao

@@ -1005,10 +1005,17 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
     val apiSyncStatus by viewModel.syncStatus.collectAsState()
     var showPhpInfoDialog by remember { mutableStateOf(false) }
 
+    // Firebase Sync inputs
+    var firebaseSyncEnabledInput by remember { mutableStateOf(true) }
+    var firebaseDatabaseUrlInput by remember { mutableStateOf("") }
+    var firebaseSettingsSucceed by remember { mutableStateOf("") }
+
     LaunchedEffect(appConfig) {
         appConfig?.let {
             bannerUrlInput = it.bannerAdUrl
             popUrlInput = it.popUnderUrl
+            bannerCodeInput = it.bannerAdCode
+            popUrlInput = it.popUnderUrl // duplicate check safely
             bannerCodeInput = it.bannerAdCode
             popCodeInput = it.popUnderCode
             showNoticeInput = it.showNotice
@@ -1018,6 +1025,8 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
             noticeLinkInput = it.noticeLink
             apiSyncEnabledInput = it.apiSyncEnabled
             apiSyncUrlInput = it.apiSyncUrl
+            firebaseSyncEnabledInput = it.firebaseSyncEnabled
+            firebaseDatabaseUrlInput = it.firebaseDatabaseUrl
         }
     }
 
@@ -2090,6 +2099,98 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
                                     Icon(imageVector = Icons.Default.Build, contentDescription = "Instructions", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(text = "সার্ভার ফাইল ও ডোমেন সেটআপ নির্দেশাবলী", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        // 7. Google Firebase Settings Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkGreenSurface),
+                            border = BorderStroke(1.dp, ForestGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Firebase Sync",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "গুগল ফায়ারবেস রিয়েল-টাইম সিঙ্ক",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Switch(
+                                        checked = firebaseSyncEnabledInput,
+                                        onCheckedChange = { firebaseSyncEnabledInput = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = NeonGreen
+                                        )
+                                    )
+                                }
+
+                                Text(
+                                    text = "আপনার নিজের ফায়ারবেস প্রজেক্টের সাথে যুক্ত করে রিয়েল-টাইম ডাটা ব্রডকাস্ট চালু করতে এটি ব্যবহার করুন। 'google-services.json' ফাইলটি ইতিমধ্যই কনফিগার করা আছে!",
+                                    color = GrayText,
+                                    fontSize = 11.sp
+                                )
+
+                                TextField(
+                                    value = firebaseDatabaseUrlInput,
+                                    onValueChange = { firebaseDatabaseUrlInput = it },
+                                    label = { Text("ফায়ারবেস ডাটাবেজ URL (ঐচ্ছিক)") },
+                                    placeholder = { Text("https://your-project.firebaseio.com") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black,
+                                        unfocusedContainerColor = Color.Black,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = NeonGreen
+                                    )
+                                )
+
+                                Button(
+                                    onClick = {
+                                        viewModel.updateFirebaseSyncSettings(
+                                            firebaseSyncEnabledInput,
+                                            firebaseDatabaseUrlInput
+                                        )
+                                        firebaseSettingsSucceed = "ফায়ারবেস সেটিংস সফলভাবে সেভ করা হয়েছে!"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NeonGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = "ফায়ারবেস সেটিংস সেভ করুন", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                if (firebaseSettingsSucceed.isNotEmpty()) {
+                                    Text(
+                                        text = firebaseSettingsSucceed,
+                                        color = NeonGreen,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
                             }
                         }

@@ -46,7 +46,9 @@ class SportsRepository(context: Context) {
                 popUnderUrl = "https://gotechbd.com",
                 adminPasswordHash = hashPassword("admin123"), // Seeded default password
                 apiSyncEnabled = false,
-                apiSyncUrl = ""
+                apiSyncUrl = "",
+                firebaseSyncEnabled = true,
+                firebaseDatabaseUrl = ""
             )
             appConfigDao.insertOrUpdateConfig(defaultConfig)
         }

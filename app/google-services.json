@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "907699336684",
+    "project_id": "khelaghor-44301",
+    "storage_bucket": "khelaghor-44301.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:907699336684:android:ffba14881990c475bb7cc9",
+        "android_client_info": {
+          "package_name": "com.aistudio.khelaghor.ysptrz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJWibtwtAhBKnucydALt1iTUcCv76szv8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
