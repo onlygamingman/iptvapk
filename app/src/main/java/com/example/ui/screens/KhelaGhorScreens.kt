@@ -157,8 +157,12 @@ fun AdBanner(bannerAdUrl: String?, onClick: () -> Unit) {
             .clickable {
                 onClick()
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(bannerAdUrl ?: "https://www.google.com"))
-                    context.startActivity(intent)
+                    val rawUrl = bannerAdUrl?.trim() ?: ""
+                    if (rawUrl.isNotEmpty()) {
+                        val formatted = if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) rawUrl else "https://$rawUrl"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(formatted))
+                        context.startActivity(intent)
+                    }
                 } catch (e: Exception) {}
             },
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E16)),
@@ -333,8 +337,12 @@ fun KhelaGhorHomeScreen(
                                     popUnderTriggerCode = appConfig?.popUnderCode
                                 } else if (!appConfig?.popUnderUrl.isNullOrBlank()) {
                                     try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(appConfig?.popUnderUrl))
-                                        context.startActivity(intent)
+                                        val rawPopUrl = appConfig?.popUnderUrl?.trim() ?: ""
+                                        if (rawPopUrl.isNotEmpty()) {
+                                            val formatted = if (rawPopUrl.startsWith("http://") || rawPopUrl.startsWith("https://")) rawPopUrl else "https://$rawPopUrl"
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(formatted))
+                                            context.startActivity(intent)
+                                        }
                                     } catch (e: Exception) {}
                                 }
                             }
@@ -609,6 +617,8 @@ fun KhelaGhorCategoriesScreen(
     viewModel: SportsViewModel,
     onChannelClick: (streamUrl: String, channelName: String) -> Unit
 ) {
+    val context = LocalContext.current
+    val appConfig by viewModel.appConfig.collectAsState()
     val categories by viewModel.channelCategories.collectAsState()
     val allChannels by viewModel.allChannels.collectAsState()
     var expandedCategory by remember { mutableStateOf<String?>(null) }
@@ -730,7 +740,19 @@ fun KhelaGhorCategoriesScreen(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clickable { onChannelClick(channel.streamUrl, channel.channelName) }
+                                                .clickable {
+                                                    if (appConfig?.adsEnabled == true && !appConfig?.popUnderUrl.isNullOrBlank()) {
+                                                        try {
+                                                            val rawPopUrl = appConfig?.popUnderUrl?.trim() ?: ""
+                                                            if (rawPopUrl.isNotEmpty()) {
+                                                                val formatted = if (rawPopUrl.startsWith("http://") || rawPopUrl.startsWith("https://")) rawPopUrl else "https://$rawPopUrl"
+                                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(formatted))
+                                                                context.startActivity(intent)
+                                                            }
+                                                        } catch (e: Exception) {}
+                                                    }
+                                                    onChannelClick(channel.streamUrl, channel.channelName)
+                                                }
                                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.SpaceBetween
@@ -1009,6 +1031,7 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
     var firebaseSyncEnabledInput by remember { mutableStateOf(true) }
     var firebaseDatabaseUrlInput by remember { mutableStateOf("") }
     var firebaseSettingsSucceed by remember { mutableStateOf("") }
+    val firebaseSyncStatus by viewModel.firebaseSyncStatus.collectAsState()
 
     LaunchedEffect(appConfig) {
         appConfig?.let {
@@ -2191,6 +2214,20 @@ fun KhelaGhorAdminPanel(viewModel: SportsViewModel) {
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
+                                }
+
+                                if (firebaseSyncStatus.isNotEmpty()) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "স্ট্যাটাস: $firebaseSyncStatus",
+                                            color = if (firebaseSyncStatus.contains("সক্রিয়") || firebaseSyncStatus.contains("সফল")) NeonGreen else Color.LightGray,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

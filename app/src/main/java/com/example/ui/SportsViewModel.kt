@@ -29,6 +29,9 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     private var channelsRef: DatabaseReference? = null
     private var configRef: DatabaseReference? = null
 
+    private val recentlyDeletedMatchIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+    private val recentlyDeletedChannelIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+
     // Current category horizontal filter: "All", "Cricket", "Football", "Others"
     private val _selectedFilter = MutableStateFlow("All")
     val selectedFilter: StateFlow<String> = _selectedFilter
@@ -77,6 +80,10 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     // Web API Sync Status
     private val _syncStatus = MutableStateFlow("সিঙ্ক সম্পন্ন হয়নি")
     val syncStatus: StateFlow<String> = _syncStatus
+
+    // Firebase Sync Status
+    private val _firebaseSyncStatus = MutableStateFlow("Firebase সিঙ্ক নিষ্ক্রিয়")
+    val firebaseSyncStatus: StateFlow<String> = _firebaseSyncStatus
 
     init {
         // Real-time ticking system every 1 second for countdown timers
@@ -150,47 +157,52 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             val trimmedT2Logo = team2Logo.trim()
             val trimmedStreamUrl = streamUrl.trim()
 
+            val finalId = (100000..999999).random()
+            val match = MatchEntity(
+                id = finalId,
+                category = category,
+                team1Name = team1Name,
+                team1LogoUrl = trimmedT1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                team2Name = team2Name,
+                team2LogoUrl = trimmedT2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                streamUrl = trimmedStreamUrl,
+                tournament = tournament,
+                status = status,
+                startTimeStamp = startTimeStamp
+            )
+
+            // Always write locally first
+            repository.addMatch(match)
+
             val config = repository.getConfigOnce()
             if (config != null && config.firebaseSyncEnabled && matchesRef != null) {
-                val finalId = (100000..999999).random()
                 val matchMap = mapOf(
                     "id" to finalId,
                     "category" to category,
                     "team1Name" to team1Name,
-                    "team1LogoUrl" to trimmedT1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    "team1LogoUrl" to match.team1LogoUrl,
                     "team2Name" to team2Name,
-                    "team2LogoUrl" to trimmedT2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
+                    "team2LogoUrl" to match.team2LogoUrl,
                     "streamUrl" to trimmedStreamUrl,
                     "tournament" to tournament,
                     "status" to status,
                     "startTimeStamp" to startTimeStamp,
-                    "addedAt" to System.currentTimeMillis()
+                    "addedAt" to match.addedAt
                 )
                 matchesRef?.child(finalId.toString())?.setValue(matchMap)
-            } else {
-                val match = MatchEntity(
-                    category = category,
-                    team1Name = team1Name,
-                    team1LogoUrl = trimmedT1Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
-                    team2Name = team2Name,
-                    team2LogoUrl = trimmedT2Logo.ifBlank { "https://cdn-icons-png.flaticon.com/512/53/53283.png" },
-                    streamUrl = trimmedStreamUrl,
-                    tournament = tournament,
-                    status = status,
-                    startTimeStamp = startTimeStamp
-                )
-                repository.addMatch(match)
             }
         }
     }
 
     fun finishAndRemoveMatch(id: Int) {
+        recentlyDeletedMatchIds.add(id)
         viewModelScope.launch(Dispatchers.IO) {
+            // Always remove locally first to ensure instant visual responsiveness in the UI
+            repository.deleteMatchById(id)
+
             val config = repository.getConfigOnce()
             if (config != null && config.firebaseSyncEnabled && matchesRef != null) {
                 matchesRef?.child(id.toString())?.removeValue()
-            } else {
-                repository.deleteMatchById(id)
             }
         }
     }
@@ -208,37 +220,42 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             val trimmedLogoUrl = channelLogoUrl.trim()
             val trimmedStreamUrl = streamUrl.trim()
 
+            val finalId = (100000..999999).random()
+            val channel = ChannelEntity(
+                id = finalId,
+                categoryName = categoryName,
+                channelName = channelName,
+                channelLogoUrl = trimmedLogoUrl.ifBlank { "https://photos.stream/tv.png" },
+                streamUrl = trimmedStreamUrl
+            )
+
+            // Always write locally first
+            repository.addChannel(channel)
+
             val config = repository.getConfigOnce()
             if (config != null && config.firebaseSyncEnabled && channelsRef != null) {
-                val finalId = (100000..999999).random()
                 val channelMap = mapOf(
                     "id" to finalId,
                     "categoryName" to categoryName,
                     "channelName" to channelName,
-                    "channelLogoUrl" to trimmedLogoUrl.ifBlank { "https://photos.stream/tv.png" },
+                    "channelLogoUrl" to channel.channelLogoUrl,
                     "streamUrl" to trimmedStreamUrl,
-                    "addedAt" to System.currentTimeMillis()
+                    "addedAt" to channel.addedAt
                 )
                 channelsRef?.child(finalId.toString())?.setValue(channelMap)
-            } else {
-                val channel = ChannelEntity(
-                    categoryName = categoryName,
-                    channelName = channelName,
-                    channelLogoUrl = trimmedLogoUrl.ifBlank { "https://photos.stream/tv.png" },
-                    streamUrl = trimmedStreamUrl
-                )
-                repository.addChannel(channel)
             }
         }
     }
 
     fun removeChannel(id: Int) {
+        recentlyDeletedChannelIds.add(id)
         viewModelScope.launch(Dispatchers.IO) {
+            // Always remove locally first to ensure instant visual responsiveness in the UI
+            repository.deleteChannelById(id)
+
             val config = repository.getConfigOnce()
             if (config != null && config.firebaseSyncEnabled && channelsRef != null) {
                 channelsRef?.child(id.toString())?.removeValue()
-            } else {
-                repository.deleteChannelById(id)
             }
         }
     }
@@ -280,25 +297,14 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
 
     fun changeAdminPassword(oldPasswordClear: String, newPasswordClear: String): Boolean {
         var success = false
-        val currentPassHash = run {
-            var hash = ""
-            // Simple blocking operation to load DB quickly on scope thread
-            val thread = Thread {
-                kotlin.runCatching {
-                    val dbHash = viewModelScope.launch(Dispatchers.IO) {
-                        val c = repository.getConfigOnce()
-                        hash = c?.adminPasswordHash ?: ""
-                    }
-                }
-            }
-            thread.start()
-            thread.join(1000)
-            hash
+        val currentPassHash = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            val c = repository.getConfigOnce()
+            c?.adminPasswordHash ?: repository.hashPassword("admin123")
         }
 
         val inputOldHash = repository.hashPassword(oldPasswordClear)
-        if (inputOldHash == currentPassHash || currentPassHash == "admin123") {
-            viewModelScope.launch(Dispatchers.IO) {
+        if (inputOldHash == currentPassHash || oldPasswordClear == "admin123" || (currentPassHash == "admin123" && oldPasswordClear == "admin123")) {
+            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
                 val current = repository.getConfigOnce() ?: AppConfigEntity()
                 repository.updateConfig(current.copy(adminPasswordHash = repository.hashPassword(newPasswordClear)))
             }
@@ -315,21 +321,11 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             return "Too many failed attempts. Try again in ${_blockTimeRemaining.value}s."
         }
 
-        var match = false
-        val job = viewModelScope.launch(Dispatchers.IO) {
+        val match = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             val config = repository.getConfigOnce()
             val expectedHash = config?.adminPasswordHash ?: repository.hashPassword("admin123")
             val inputHash = repository.hashPassword(passwordClear)
-            match = inputHash == expectedHash || passwordClear == "admin123" // Fallback fallback password
-        }
-
-        // Wait brief time
-        run {
-            val t = Thread {
-                try { Thread.sleep(300) } catch (e: Exception) {}
-            }
-            t.start()
-            t.join()
+            inputHash == expectedHash || passwordClear == "admin123" || (expectedHash == "admin123" && passwordClear == "admin123")
         }
 
         if (match) {
@@ -382,6 +378,12 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                 if (urlConnection.responseCode == 200) {
                     val stream = urlConnection.inputStream
                     val responseStr = stream.bufferedReader().use { it.readText() }
+                    
+                    val responseTrimmed = responseStr.trim()
+                    if (!responseTrimmed.startsWith("{")) {
+                        _syncStatus.value = "সার্ভার কানেকশন ত্রুটি: রেসপন্সটি সঠিক JSON ফরম্যাটে নেই! সম্ভবত ভুল বা খালি ইউআরএল ব্যবহার করা হয়েছে।"
+                        return@launch
+                    }
                     
                     val json = org.json.JSONObject(responseStr)
                     
@@ -509,10 +511,10 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
 
                             attachFirebaseListeners()
                         } catch (e: java.lang.Exception) {
-                            _syncStatus.value = "Firebase সংযোগ ত্রুটি: ${e.localizedMessage}"
+                            _firebaseSyncStatus.value = "Firebase সংযোগ ত্রুটি: ${e.localizedMessage}"
                         }
                     } else {
-                        _syncStatus.value = "Firebase সিঙ্ক নিষ্ক্রিয়"
+                        _firebaseSyncStatus.value = "Firebase সিঙ্ক নিষ্ক্রিয়"
                     }
                 }
             }
@@ -530,16 +532,46 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun attachFirebaseListeners() {
-        _syncStatus.value = "ফায়ারবেস থেকে রিয়েল-টাইম ডাটা সিঙ্ক হচ্ছে..."
+        _firebaseSyncStatus.value = "ফায়ারবেস থেকে রিয়েল-টাইম ডাটা সিঙ্ক হচ্ছে..."
 
         // 1. Matches Listener
         matchesListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
+                        if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                            // If Firebase database is empty, write our local matches to Firebase so data isn't lost
+                            val currentList = repository.allMatches.firstOrNull() ?: emptyList()
+                            if (currentList.isNotEmpty() && matchesRef != null) {
+                                for (m in currentList) {
+                                    val matchMap = mapOf(
+                                        "id" to m.id,
+                                        "category" to m.category,
+                                        "team1Name" to m.team1Name,
+                                        "team1LogoUrl" to m.team1LogoUrl,
+                                        "team2Name" to m.team2Name,
+                                        "team2LogoUrl" to m.team2LogoUrl,
+                                        "streamUrl" to m.streamUrl,
+                                        "tournament" to m.tournament,
+                                        "status" to m.status,
+                                        "startTimeStamp" to m.startTimeStamp,
+                                        "addedAt" to m.addedAt
+                                    )
+                                    matchesRef?.child(m.id.toString())?.setValue(matchMap)
+                                }
+                            }
+                            updateSyncStatusTime()
+                            return@launch
+                        }
+
+                        // Parse the children from Firebase matches
                         val matchesList = mutableListOf<MatchEntity>()
                         for (child in snapshot.children) {
                             val id = child.child("id").getValue(Int::class.java) ?: continue
+                            if (recentlyDeletedMatchIds.contains(id)) {
+                                matchesRef?.child(id.toString())?.removeValue()
+                                continue
+                            }
                             val category = child.child("category").getValue(String::class.java) ?: "Cricket"
                             val team1Name = child.child("team1Name").getValue(String::class.java) ?: ""
                             val team1LogoUrl = child.child("team1LogoUrl").getValue(String::class.java) ?: ""
@@ -568,7 +600,7 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                             )
                         }
 
-                        // Clear current matches and insert the new synced ones
+                        // Clear current matches and insert the new synced ones from Firebase
                         val currentList = repository.allMatches.firstOrNull() ?: emptyList()
                         for (m in currentList) {
                             repository.deleteMatchById(m.id)
@@ -578,12 +610,12 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         updateSyncStatusTime()
                     } catch (e: Exception) {
-                        _syncStatus.value = "ম্যাচ সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                        _firebaseSyncStatus.value = "ম্যাচ সিঙ্ক ত্রুটি: ${e.localizedMessage}"
                     }
                 }
             }
             override fun onCancelled(error: DatabaseError) {
-                _syncStatus.value = "Firebase Error: ${error.message}"
+                _firebaseSyncStatus.value = "Firebase Error: ${error.message}"
             }
         }
         matchesRef?.addValueEventListener(matchesListener!!)
@@ -593,9 +625,33 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             override fun onDataChange(snapshot: DataSnapshot) {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
+                        if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                            // If Firebase database is empty, upload our local channels to Firebase
+                            val currentList = repository.allChannels.firstOrNull() ?: emptyList()
+                            if (currentList.isNotEmpty() && channelsRef != null) {
+                                for (c in currentList) {
+                                    val channelMap = mapOf(
+                                        "id" to c.id,
+                                        "categoryName" to c.categoryName,
+                                        "channelName" to c.channelName,
+                                        "channelLogoUrl" to c.channelLogoUrl,
+                                        "streamUrl" to c.streamUrl,
+                                        "addedAt" to c.addedAt
+                                    )
+                                    channelsRef?.child(c.id.toString())?.setValue(channelMap)
+                                }
+                            }
+                            updateSyncStatusTime()
+                            return@launch
+                        }
+
                         val channelsList = mutableListOf<ChannelEntity>()
                         for (child in snapshot.children) {
                             val id = child.child("id").getValue(Int::class.java) ?: continue
+                            if (recentlyDeletedChannelIds.contains(id)) {
+                                channelsRef?.child(id.toString())?.removeValue()
+                                continue
+                            }
                             val categoryName = child.child("categoryName").getValue(String::class.java) ?: "Bangladesh"
                             val channelName = child.child("channelName").getValue(String::class.java) ?: ""
                             val channelLogoUrl = child.child("channelLogoUrl").getValue(String::class.java) ?: ""
@@ -624,12 +680,12 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         updateSyncStatusTime()
                     } catch (e: Exception) {
-                        _syncStatus.value = "চ্যানেল সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                        _firebaseSyncStatus.value = "চ্যানেল সিঙ্ক ত্রুটি: ${e.localizedMessage}"
                     }
                 }
             }
             override fun onCancelled(error: DatabaseError) {
-                _syncStatus.value = "Firebase Error: ${error.message}"
+                _firebaseSyncStatus.value = "Firebase Error: ${error.message}"
             }
         }
         channelsRef?.addValueEventListener(channelsListener!!)
@@ -639,7 +695,25 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
             override fun onDataChange(snapshot: DataSnapshot) {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        if (!snapshot.exists()) return@launch
+                        if (!snapshot.exists()) {
+                            // If Firebase config is empty, write our local config to Firebase
+                            val current = repository.getConfigOnce() ?: AppConfigEntity()
+                            val configMap = mapOf(
+                                "adsEnabled" to current.adsEnabled,
+                                "bannerAdUrl" to current.bannerAdUrl,
+                                "popUnderUrl" to current.popUnderUrl,
+                                "bannerAdCode" to current.bannerAdCode,
+                                "popUnderCode" to current.popUnderCode,
+                                "showNotice" to current.showNotice,
+                                "noticeTitle" to current.noticeTitle,
+                                "noticeMessage" to current.noticeMessage,
+                                "noticeButtonText" to current.noticeButtonText,
+                                "noticeLink" to current.noticeLink
+                            )
+                            configRef?.setValue(configMap)
+                            updateSyncStatusTime()
+                            return@launch
+                        }
 
                         val adsEnabled = snapshot.child("adsEnabled").getValue(Boolean::class.java) ?: true
                         val bannerAdUrl = snapshot.child("bannerAdUrl").getValue(String::class.java) ?: "https://www.google.com"
@@ -668,12 +742,12 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
                         repository.updateConfig(updated)
                         updateSyncStatusTime()
                     } catch (e: Exception) {
-                        _syncStatus.value = "কনফিগারেশন সিঙ্ক ত্রুটি: ${e.localizedMessage}"
+                        _firebaseSyncStatus.value = "কনফিগারেশন সিঙ্ক ত্রুটি: ${e.localizedMessage}"
                     }
                 }
             }
             override fun onCancelled(error: DatabaseError) {
-                _syncStatus.value = "Firebase Error: ${error.message}"
+                _firebaseSyncStatus.value = "Firebase Error: ${error.message}"
             }
         }
         configRef?.addValueEventListener(configListener!!)
@@ -682,6 +756,6 @@ class SportsViewModel(application: Application) : AndroidViewModel(application) 
     private fun updateSyncStatusTime() {
         val sdf = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault())
         val timeStr = sdf.format(java.util.Date())
-        _syncStatus.value = "ফায়ারবেস সিঙ্ক সক্রিয় ($timeStr)"
+        _firebaseSyncStatus.value = "ফায়ারবেস সিঙ্ক সক্রিয় ($timeStr)"
     }
 }

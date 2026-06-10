@@ -48,9 +48,14 @@ class SportsRepository(context: Context) {
                 apiSyncEnabled = false,
                 apiSyncUrl = "",
                 firebaseSyncEnabled = true,
-                firebaseDatabaseUrl = ""
+                firebaseDatabaseUrl = "https://khelaghor-44301-default-rtdb.firebaseio.com"
             )
             appConfigDao.insertOrUpdateConfig(defaultConfig)
+        } else if (existing.firebaseDatabaseUrl.isBlank()) {
+            appConfigDao.insertOrUpdateConfig(existing.copy(
+                firebaseDatabaseUrl = "https://khelaghor-44301-default-rtdb.firebaseio.com",
+                firebaseSyncEnabled = true
+            ))
         }
     }
 
